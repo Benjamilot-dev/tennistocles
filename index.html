@@ -100,6 +100,7 @@
             <li><strong>Deuce (Iguales):</strong> Si empatan 40-40, se debe ganar por 2 puntos de diferencia. El jugador que anote obtiene la <strong>Ventaja (Ad)</strong>. Si anota de nuevo gana el juego; si anota el rival, vuelven a Deuce.</li>
             <li><strong>Sets y Tiebreak:</strong> Un Set se gana al llegar a 6 juegos (con diferencia de 2). Si empatan <strong>6-6</strong>, la app activa automáticamente un <strong>Tiebreak</strong> numérico (1, 2, 3...) donde el primero en llegar a 7 puntos con ventaja de 2 se lleva el Set.</li>
             <li><strong>Victoria:</strong> El partido es al mejor de 3 Sets (gana el primero en llevarse 2 Sets).</li>
+            <li><strong>Formato 15-30-45 (Rápido):</strong> Si seleccionas este formato, el partido se disputa al mejor de 3 juegos de tenis individuales. El marcador sigue la escala tradicional pero mostrando 45: <strong>0 ➜ 15 ➜ 30 ➜ 45 ➜ Ventaja (Ad)</strong>. Quien gane 2 de estos juegos individuales gana el partido.</li>
             <li><strong>Deshacer:</strong> Si marcas un punto por error, usa el botón <em>Deshacer Punto</em> para volver al marcador exacto anterior.</li>
           </ul>
         </div>
@@ -109,23 +110,53 @@
           <h3>Configurar Partido</h3>
           <form id="game-setup-form" class="flex-form">
             <div class="input-group">
-              <label for="select-p1">Jugador 1</label>
-              <select id="select-p1" required>
-                <option value="" disabled selected>Selecciona jugador 1</option>
+              <label for="game-mode">Modalidad</label>
+              <select id="game-mode">
+                <option value="singles" selected>Individuales (1 vs 1)</option>
+                <option value="doubles">Dobles (2 vs 2)</option>
               </select>
             </div>
+
+            <!-- Contenedor Jugador/Pareja 1 -->
+            <div class="setup-player-section">
+              <div class="input-group">
+                <label id="lbl-select-p1" for="select-p1">Jugador 1</label>
+                <select id="select-p1" required>
+                  <option value="" disabled selected>Selecciona jugador 1</option>
+                </select>
+              </div>
+              <div class="input-group doubles-field hidden" id="group-p1b" style="margin-top: 10px;">
+                <label for="select-p1b">Compañero (Pareja 1)</label>
+                <select id="select-p1b">
+                  <option value="" disabled selected>Selecciona compañero</option>
+                </select>
+              </div>
+            </div>
+
             <div class="vs-divider">VS</div>
-            <div class="input-group">
-              <label for="select-p2">Jugador 2</label>
-              <select id="select-p2" required>
-                <option value="" disabled selected>Selecciona jugador 2</option>
-              </select>
+
+            <!-- Contenedor Jugador/Pareja 2 -->
+            <div class="setup-player-section">
+              <div class="input-group">
+                <label id="lbl-select-p2" for="select-p2">Jugador 2</label>
+                <select id="select-p2" required>
+                  <option value="" disabled selected>Selecciona jugador 2</option>
+                </select>
+              </div>
+              <div class="input-group doubles-field hidden" id="group-p2b" style="margin-top: 10px;">
+                <label for="select-p2b">Compañero (Pareja 2)</label>
+                <select id="select-p2b">
+                  <option value="" disabled selected>Selecciona compañero</option>
+                </select>
+              </div>
             </div>
-            <div class="input-group">
+
+            <div class="input-group" style="margin-top: 15px;">
               <label for="game-format">Formato de Partido</label>
               <select id="game-format">
                 <option value="3-sets" selected>Al mejor de 3 Sets</option>
                 <option value="1-set">Set único (Rápido)</option>
+                <option value="3-games-45">3 Juegos de Tenis (15-30-45)</option>
               </select>
             </div>
             <button type="submit" class="btn btn-primary btn-full">
@@ -215,37 +246,98 @@
         <!-- Setup Tournament Card -->
         <div id="tournament-setup-card" class="glass-card">
           <h3>Crear Torneo</h3>
-          <form id="tournament-setup-form" class="flex-form">
-            <div class="input-group">
-              <input type="text" id="tournament-name" placeholder="Nombre del Torneo (ej. Copa Wimbledon)" required>
-            </div>
-            
-            <div class="input-group">
-              <label for="tournament-size">Cantidad de Jugadores</label>
-              <input type="number" id="tournament-size" min="2" max="32" value="4" required>
-            </div>
+          
+          <div class="tournament-tabs">
+            <button type="button" id="btn-tab-express" class="tourney-tab-btn active">Torneo Exprés</button>
+            <button type="button" id="btn-tab-normal" class="tourney-tab-btn">Torneo Normal</button>
+            <button type="button" id="btn-tab-custom" class="tourney-tab-btn">Torneo Personalizado</button>
+          </div>
 
-            <div class="input-group">
-              <label for="tournament-format">Formato de Partido</label>
-              <select id="tournament-format">
-                <option value="3-sets" selected>Al mejor de 3 Sets (Estándar)</option>
-                <option value="1-set">Set único (Rápido)</option>
-              </select>
-            </div>
+          <!-- PANEL: TORNEO EXPRÉS -->
+          <div id="panel-tournament-express" class="tournament-panel active">
+            <form id="express-tournament-form" class="flex-form">
+              <div class="info-alert">
+                <svg class="info-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+                <span>Genera al instante un torneo exprés de 4 jugadores/parejas con el formato de 45 puntos.</span>
+              </div>
+              <div class="input-group flex-row-align" style="margin-bottom:15px; display:flex; align-items:center;">
+                <input type="checkbox" id="express-doubles" style="width:20px; height:20px; margin-right:8px; cursor:pointer;">
+                <label for="express-doubles" style="margin:0; cursor:pointer; font-weight:600; font-size:14px; color:var(--text-color);">Modalidad de Dobles (Requiere 8 jugadores)</label>
+              </div>
+              <button type="submit" class="btn btn-primary btn-full">
+                ⚡ Iniciar Torneo Exprés
+              </button>
+            </form>
+          </div>
 
-            <div class="info-alert">
-              <svg class="info-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="12" y1="16" x2="12" y2="12"/>
-                <line x1="12" y1="8" x2="12.01" y2="8"/>
-              </svg>
-              <span>El torneo seleccionará automáticamente a los mejores jugadores según su puntaje de estrellas.</span>
-            </div>
+          <!-- PANEL: TORNEO NORMAL -->
+          <div id="panel-tournament-normal" class="tournament-panel">
+            <form id="normal-tournament-form" class="flex-form">
+              <div class="info-alert">
+                <svg class="info-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+                <span>Genera un torneo clásico de 8 jugadores/parejas disputado al mejor de 3 sets tradicionales.</span>
+              </div>
+              <div class="input-group flex-row-align" style="margin-bottom:15px; display:flex; align-items:center;">
+                <input type="checkbox" id="normal-doubles" style="width:20px; height:20px; margin-right:8px; cursor:pointer;">
+                <label for="normal-doubles" style="margin:0; cursor:pointer; font-weight:600; font-size:14px; color:var(--text-color);">Modalidad de Dobles (Requiere 16 jugadores)</label>
+              </div>
+              <button type="submit" class="btn btn-primary btn-full">
+                🏆 Iniciar Torneo Normal
+              </button>
+            </form>
+          </div>
 
-            <button type="submit" class="btn btn-primary btn-full">
-              Generar Cuadro de Torneo
-            </button>
-          </form>
+          <!-- PANEL: TORNEO PERSONALIZADO -->
+          <div id="panel-tournament-custom" class="tournament-panel">
+            <form id="tournament-setup-form" class="flex-form">
+              <div class="input-group">
+                <input type="text" id="tournament-name" placeholder="Nombre del Torneo (ej. Copa Wimbledon)" required>
+              </div>
+              
+              <div class="input-group">
+                <label for="tournament-size">Cantidad de Parejas / Jugadores</label>
+                <input type="number" id="tournament-size" min="2" max="32" value="4" required>
+              </div>
+
+              <div class="input-group">
+                <label for="tournament-mode">Modalidad</label>
+                <select id="tournament-mode">
+                  <option value="singles" selected>Individuales</option>
+                  <option value="doubles">Dobles (Emparejamiento automático)</option>
+                </select>
+              </div>
+
+              <div class="input-group">
+                <label for="tournament-format">Formato de Partido</label>
+                <select id="tournament-format">
+                  <option value="3-sets" selected>Al mejor de 3 Sets (Estándar)</option>
+                  <option value="1-set">Set único (Rápido)</option>
+                  <option value="3-games-45">3 Juegos de Tenis (15-30-45)</option>
+                </select>
+              </div>
+
+              <div class="info-alert">
+                <svg class="info-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+                <span>El torneo seleccionará automáticamente a los mejores jugadores. En modalidad Dobles, se requerirá el doble de jugadores registrados para armar las parejas de forma balanceada.</span>
+              </div>
+
+              <button type="submit" class="btn btn-primary btn-full">
+                Generar Cuadro de Torneo
+              </button>
+            </form>
+          </div>
         </div>
 
         <!-- Tournament Bracket Card -->
@@ -271,8 +363,8 @@
         </div>
       </section>
 
-      <!-- VIEW: AJUSTES -->
-      <section id="view-settings" class="app-view">
+      <!-- VIEW: AJUSTES (Oculta para evitar modificaciones por usuarios) -->
+      <section id="view-settings" class="app-view" style="display: none !important;">
         <div class="view-header">
           <h2>Ajustes</h2>
           <p>Configura la sincronización con tu base de datos Firebase.</p>
@@ -359,17 +451,32 @@
         <span>Torneos</span>
       </button>
 
-      <button class="nav-tab" data-view="view-settings">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
-        <span>Ajustes</span>
-      </button>
+
     </nav>
   </div>
 
-  <!-- App logic entry point -->
+  <!-- Modal Premium de Notificaciones -->
+  <div id="custom-modal" class="modal-overlay hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span id="modal-icon" class="modal-icon">🏆</span>
+        <h3 id="modal-title">¡Partido Finalizado!</h3>
+      </div>
+      <div class="modal-body">
+        <p id="modal-message"></p>
+        <div id="modal-joke-box" class="modal-joke-box hidden">
+          <span class="joke-quote">“</span>
+          <p id="modal-joke-text"></p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-close-modal" class="btn btn-primary">Entendido</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module" src="db.js"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>

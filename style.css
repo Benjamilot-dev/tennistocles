@@ -1017,3 +1017,184 @@ select {
   font-weight: bold;
 }
 
+/* ==========================================
+   PESTAÑAS DE TORNEO Y MODAL PREMIUM
+   ========================================== */
+
+.tournament-tabs {
+  display: flex;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  margin-bottom: 20px;
+}
+
+.tourney-tab-btn {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tourney-tab-btn:hover {
+  color: var(--text-color);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.tourney-tab-btn.active {
+  background: var(--accent);
+  color: #121212;
+  box-shadow: 0 4px 12px rgba(163, 230, 53, 0.3);
+}
+
+.tournament-panel {
+  display: none;
+}
+
+.tournament-panel.active {
+  display: block;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(9, 9, 11, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  transition: opacity 0.3s ease;
+  opacity: 1;
+}
+
+.modal-overlay.hidden {
+  display: none !important;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Modal Card */
+.modal-card {
+  background: linear-gradient(135deg, rgba(28, 28, 30, 0.9) 0%, rgba(18, 18, 18, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  width: 100%;
+  max-width: 440px;
+  padding: 28px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  animation: modalScaleUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  color: var(--text-color);
+  text-align: center;
+}
+
+@keyframes modalScaleUp {
+  0% {
+    transform: scale(0.9) translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Modal Header */
+.modal-header {
+  margin-bottom: 20px;
+}
+
+.modal-icon {
+  font-size: 48px;
+  display: inline-block;
+  margin-bottom: 12px;
+  animation: trophyBounce 1.5s infinite alternate ease-in-out;
+}
+
+@keyframes trophyBounce {
+  0% { transform: translateY(0) scale(1); }
+  100% { transform: translateY(-8px) scale(1.05); }
+}
+
+.modal-header h3 {
+  font-family: 'Outfit', sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  margin: 0;
+  background: linear-gradient(to right, var(--text-color), var(--text-muted));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Modal Body */
+.modal-body {
+  margin-bottom: 24px;
+}
+
+.modal-body p {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  margin: 0 0 16px 0;
+}
+
+/* Modal Joke Box */
+.modal-joke-box {
+  background: rgba(163, 230, 53, 0.06);
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+  padding: 16px 20px;
+  position: relative;
+  text-align: left;
+  margin-top: 18px;
+  border: 1px solid rgba(163, 230, 53, 0.12);
+  border-left-width: 4px;
+}
+
+.modal-joke-box.hidden {
+  display: none !important;
+}
+
+.joke-quote {
+  font-family: 'Outfit', sans-serif;
+  font-size: 44px;
+  font-weight: 800;
+  color: var(--accent);
+  opacity: 0.25;
+  position: absolute;
+  top: -8px;
+  left: 12px;
+  line-height: 1;
+}
+
+#modal-joke-text {
+  font-size: 13.5px;
+  font-style: italic;
+  line-height: 1.5;
+  color: var(--text-color);
+  margin: 0;
+  padding-left: 12px;
+}
+
+/* Modal Footer */
+.modal-footer {
+  display: flex;
+  justify-content: center;
+}
+
