@@ -208,6 +208,7 @@ body {
 
 input[type="text"],
 input[type="password"],
+input[type="number"],
 select {
   width: 100%;
   background-color: var(--bg-input);
@@ -949,3 +950,61 @@ select {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
 }
+
+/* Help Guides Elements */
+.flex-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.flex-header .btn-help {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.flex-header .btn-help:active {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  transform: scale(0.97);
+}
+
+.help-card {
+  background-color: rgba(30, 41, 59, 0.45) !important;
+  border-color: rgba(204, 255, 0, 0.2) !important;
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.help-list {
+  list-style: none;
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.help-list li {
+  line-height: 1.45;
+  position: relative;
+  padding-left: 16px;
+}
+
+.help-list li::before {
+  content: "•";
+  color: var(--accent);
+  position: absolute;
+  left: 0;
+  font-weight: bold;
+}
+

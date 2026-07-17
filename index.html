@@ -82,9 +82,25 @@
 
       <!-- VIEW: JUEGO RÁPIDO -->
       <section id="view-quick-game" class="app-view">
-        <div class="view-header">
-          <h2>Juego Rápido</h2>
-          <p>Lleva el marcador de un partido en tiempo real.</p>
+        <div class="view-header flex-header">
+          <div>
+            <h2>Juego Rápido</h2>
+            <p>Lleva el marcador de un partido en tiempo real.</p>
+          </div>
+          <button id="btn-help-game" class="btn-help" type="button">❓ Ayuda</button>
+        </div>
+
+        <!-- Collapsible Game Help Card -->
+        <div id="help-game-card" class="glass-card help-card hidden">
+          <h3>Guía de Juego Rápido</h3>
+          <ul class="help-list">
+            <li><strong>Inicio:</strong> Selecciona dos jugadores registrados en los menús desplegables y presiona <em>Iniciar Partido</em>.</li>
+            <li><strong>Puntuación:</strong> Los puntos se marcan sumando con el botón de cada jugador. La secuencia sigue el estándar de tenis: <strong>0 ➜ 15 ➜ 30 ➜ 40 ➜ Juego</strong>.</li>
+            <li><strong>Deuce (Iguales):</strong> Si empatan 40-40, se debe ganar por 2 puntos de diferencia. El jugador que anote obtiene la <strong>Ventaja (Ad)</strong>. Si anota de nuevo gana el juego; si anota el rival, vuelven a Deuce.</li>
+            <li><strong>Sets y Tiebreak:</strong> Un Set se gana al llegar a 6 juegos (con diferencia de 2). Si empatan <strong>6-6</strong>, la app activa automáticamente un <strong>Tiebreak</strong> numérico (1, 2, 3...) donde el primero en llegar a 7 puntos con ventaja de 2 se lleva el Set.</li>
+            <li><strong>Victoria:</strong> El partido es al mejor de 3 Sets (gana el primero en llevarse 2 Sets).</li>
+            <li><strong>Deshacer:</strong> Si marcas un punto por error, usa el botón <em>Deshacer Punto</em> para volver al marcador exacto anterior.</li>
+          </ul>
         </div>
 
         <!-- Setup Game Card -->
@@ -167,9 +183,25 @@
 
       <!-- VIEW: TORNEOS -->
       <section id="view-tournaments" class="app-view">
-        <div class="view-header">
-          <h2>Torneos</h2>
-          <p>Organiza torneos rápidos de 4 u 8 jugadores.</p>
+        <div class="view-header flex-header">
+          <div>
+            <h2>Torneos</h2>
+            <p>Organiza torneos personalizados de cualquier cantidad de jugadores.</p>
+          </div>
+          <button id="btn-help-tournament" class="btn-help" type="button">❓ Ayuda</button>
+        </div>
+
+        <!-- Collapsible Tournament Help Card -->
+        <div id="help-tournament-card" class="glass-card help-card hidden">
+          <h3>Guía de Torneos</h3>
+          <ul class="help-list">
+            <li><strong>Configuración:</strong> Ingresa un nombre para el torneo y la cantidad de participantes (desde 2 hasta 32). El sistema creará el bracket automáticamente.</li>
+            <li><strong>Elegibilidad Automática:</strong> Para garantizar un nivel competitivo, el torneo selecciona automáticamente de tu lista a los jugadores con **mayor calificación de estrellas**.</li>
+            <li><strong>Cabezas de Serie (Siembra):</strong> Los jugadores se distribuyen de forma profesional (ej. el sembrado 1 juega contra el de menor nivel) para balancear los enfrentamientos.</li>
+            <li><strong>Exenciones (BYEs):</strong> Si el número de jugadores no es potencia de 2 (ej. 3, 5, 6, 11), los mejores clasificados avanzan directo a la ronda 2 sin jugar la primera ronda, apareciendo su oponente en el cuadro como <strong>(BYE)</strong>.</li>
+            <li><strong>Jugar Partidos:</strong> Los partidos activos y jugables se resaltan en el cuadro (bracket). Haz clic en ellos para abrirlos en el marcador en vivo.</li>
+            <li><strong>Avance del Torneo:</strong> Al terminar y guardar el partido en el marcador, el ganador avanza de manera inmediata al siguiente puesto en el bracket.</li>
+          </ul>
         </div>
 
         <!-- Setup Tournament Card -->
@@ -180,18 +212,9 @@
               <input type="text" id="tournament-name" placeholder="Nombre del Torneo (ej. Copa Wimbledon)" required>
             </div>
             
-            <div class="size-group">
-              <span>Tamaño:</span>
-              <div class="radio-toggle">
-                <label>
-                  <input type="radio" name="tournament-size" value="4" checked>
-                  <span class="toggle-label">4 Jugadores (Semis)</span>
-                </label>
-                <label>
-                  <input type="radio" name="tournament-size" value="8">
-                  <span class="toggle-label">8 Jugadores (Cuartos)</span>
-                </label>
-              </div>
+            <div class="input-group">
+              <label for="tournament-size">Cantidad de Jugadores</label>
+              <input type="number" id="tournament-size" min="2" max="32" value="4" required>
             </div>
 
             <div class="info-alert">

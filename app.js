@@ -248,7 +248,7 @@ function setupEventListeners() {
   tournamentSetupForm.addEventListener("submit", (e) => {
     e.preventDefault();
     const name = document.getElementById("tournament-name").value.trim();
-    const size = parseInt(document.querySelector('input[name="tournament-size"]:checked').value);
+    const size = parseInt(document.getElementById("tournament-size").value);
 
     createTournament(name, size);
   });
@@ -269,6 +269,15 @@ function setupEventListeners() {
       document.getElementById("tournament-setup-card").classList.remove("hidden");
       loadAndRenderTournaments();
     }
+  });
+
+  // Botones de ayuda (Tutoriales colapsables)
+  document.getElementById("btn-help-game").addEventListener("click", () => {
+    document.getElementById("help-game-card").classList.toggle("hidden");
+  });
+
+  document.getElementById("btn-help-tournament").addEventListener("click", () => {
+    document.getElementById("help-tournament-card").classList.toggle("hidden");
   });
 }
 
@@ -723,6 +732,10 @@ async function loadAndRenderGames() {
 // LÓGICA DE TORNEOS
 // ==========================================
 async function createTournament(name, size) {
+  if (size < 2) {
+    alert("Se requieren al menos 2 jugadores para crear un torneo.");
+    return;
+  }
   // Validar si hay suficientes jugadores
   if (playersList.length < size) {
     alert(`Se requieren al menos ${size} jugadores registrados para crear este torneo. Actualmente tienes ${playersList.length}.`);
@@ -740,35 +753,52 @@ async function createTournament(name, size) {
 
   const selectedPlayers = sortedPlayers.slice(0, size);
 
-  // 2. Sembrar jugadores (Seed pairings) para emparejamiento equilibrado
-  // ej: 4 jugadores [1, 2, 3, 4] -> Sembras: 1 vs 4, 2 vs 3
-  // ej: 8 jugadores [1, 2, 3, 4, 5, 6, 7, 8] -> Sembras: 1vs8, 4vs5, 3vs6, 2vs7
-  let matchesRound0 = [];
-  if (size === 4) {
-    matchesRound0 = [
-      createBracketMatch(selectedPlayers[0], selectedPlayers[3]), // Semilla 1 vs 4
-      createBracketMatch(selectedPlayers[1], selectedPlayers[2])  // Semilla 2 vs 3
-    ];
-  } else if (size === 8) {
-    matchesRound0 = [
-      createBracketMatch(selectedPlayers[0], selectedPlayers[7]), // Semilla 1 vs 8
-      createBracketMatch(selectedPlayers[3], selectedPlayers[4]), // Semilla 4 vs 5
-      createBracketMatch(selectedPlayers[2], selectedPlayers[5]), // Semilla 3 vs 6
-      createBracketMatch(selectedPlayers[1], selectedPlayers[6])  // Semilla 2 vs 7
-    ];
+  // Calcular la siguiente potencia de 2 (P)
+  let P = 2;
+  while (P < size) {
+    P *= 2;
+  }
+
+  // Obtener el orden de cabezas de serie para tamaño P
+  const seedOrder = getSeedOrder(P);
+
+  // Crear partidos de la Ronda 0
+  const matchesRound0 = [];
+  for (let m = 0; m < P / 2; m++) {
+    const s1 = seedOrder[2 * m];
+    const s2 = seedOrder[2 * m + 1];
+    const p1 = s1 <= size ? selectedPlayers[s1 - 1] : null;
+    const p2 = s2 <= size ? selectedPlayers[s2 - 1] : null;
+    matchesRound0.push(createBracketMatch(p1, p2));
   }
 
   // Estructura de Rondas
-  // Para 4 jugadores: 2 rondas (Semifinales, Final)
-  // Para 8 jugadores: 3 rondas (Cuartos, Semifinales, Final)
-  const rounds = [];
-  if (size === 4) {
-    rounds.push(matchesRound0); // Semifinales
-    rounds.push([createEmptyBracketMatch()]); // Final
-  } else if (size === 8) {
-    rounds.push(matchesRound0); // Cuartos
-    rounds.push([createEmptyBracketMatch(), createEmptyBracketMatch()]); // Semifinales
-    rounds.push([createEmptyBracketMatch()]); // Final
+  const rounds = [matchesRound0];
+  let numMatches = P / 4;
+  while (numMatches >= 1) {
+    const roundMatches = [];
+    for (let i = 0; i < numMatches; i++) {
+      roundMatches.push(createEmptyBracketMatch());
+    }
+    rounds.push(roundMatches);
+    numMatches /= 2;
+  }
+
+  // Resolver exenciones (Byes) de la Ronda 0
+  if (size < P) {
+    rounds[0].forEach((match, matchIdx) => {
+      if (match.player1 && !match.player2) {
+        match.status = "finished";
+        match.winnerId = match.player1.id;
+        match.score = { p1Sets: 1, p2Sets: 0 };
+        advanceWinnerInLocalRounds(rounds, 0, matchIdx, match.player1.id, match.player1.name);
+      } else if (!match.player1 && match.player2) {
+        match.status = "finished";
+        match.winnerId = match.player2.id;
+        match.score = { p1Sets: 0, p2Sets: 1 };
+        advanceWinnerInLocalRounds(rounds, 0, matchIdx, match.player2.id, match.player2.name);
+      }
+    });
   }
 
   const newTournament = {
@@ -792,6 +822,36 @@ async function createTournament(name, size) {
   document.getElementById("tournament-active-card").classList.remove("hidden");
   
   renderActiveTournament();
+}
+
+function getSeedOrder(p) {
+  let order = [1];
+  while (order.length < p) {
+    const nextOrder = [];
+    const len = order.length;
+    for (let i = 0; i < len; i++) {
+      nextOrder.push(order[i]);
+      nextOrder.push(2 * len + 1 - order[i]);
+    }
+    order = nextOrder;
+  }
+  return order;
+}
+
+function advanceWinnerInLocalRounds(rounds, roundIdx, matchIdx, winnerId, winnerName) {
+  const nextRoundIdx = roundIdx + 1;
+  if (nextRoundIdx < rounds.length) {
+    const nextMatchIdx = Math.floor(matchIdx / 2);
+    const nextMatch = rounds[nextRoundIdx][nextMatchIdx];
+    const isFirstSlot = matchIdx % 2 === 0;
+
+    if (isFirstSlot) {
+      nextMatch.player1 = { id: winnerId, name: winnerName };
+    } else {
+      nextMatch.player2 = { id: winnerId, name: winnerName };
+    }
+    nextMatch.status = "pending";
+  }
 }
 
 function createBracketMatch(p1, p2) {
@@ -818,13 +878,16 @@ function renderActiveTournament() {
   const bracketContainer = document.getElementById("bracket-container");
   bracketContainer.innerHTML = "";
 
-  // Determinar los títulos de ronda según el tamaño del torneo
-  let roundNames = [];
-  if (activeTournament.size === 4) {
-    roundNames = ["Semifinales", "Final"];
-  } else {
-    roundNames = ["Cuartos de final", "Semifinales", "Final"];
-  }
+  // Determinar los títulos de ronda dinámicamente según la cantidad de rondas
+  const totalRounds = activeTournament.rounds.length;
+  const getRoundName = (roundIdx) => {
+    const roundsFromFinal = totalRounds - 1 - roundIdx;
+    if (roundsFromFinal === 0) return "Final";
+    if (roundsFromFinal === 1) return "Semifinales";
+    if (roundsFromFinal === 2) return "Cuartos de final";
+    if (roundsFromFinal === 3) return "Octavos de final";
+    return `Ronda ${roundIdx + 1}`;
+  };
 
   activeTournament.rounds.forEach((round, roundIdx) => {
     const roundDiv = document.createElement("div");
@@ -833,7 +896,7 @@ function renderActiveTournament() {
     // Título de la ronda
     const roundTitle = document.createElement("div");
     roundTitle.className = "bracket-round-name";
-    roundTitle.textContent = roundNames[roundIdx];
+    roundTitle.textContent = getRoundName(roundIdx);
     roundDiv.appendChild(roundTitle);
 
     round.forEach((match, matchIdx) => {
@@ -860,14 +923,17 @@ function renderActiveTournament() {
       const p1ScoreVal = isFinished ? match.score.p1Sets : "";
       const p2ScoreVal = isFinished ? match.score.p2Sets : "";
 
+      const p1NameHtml = p1 ? escapeHTML(p1.name) : (isFinished ? "(BYE)" : "<i>Por definir</i>");
+      const p2NameHtml = p2 ? escapeHTML(p2.name) : (isFinished ? "(BYE)" : "<i>Por definir</i>");
+
       matchDiv.innerHTML = `
         <div class="${p1Class}">
-          <span class="bm-player-name">${p1 ? escapeHTML(p1.name) : "<i>Por definir</i>"}</span>
+          <span class="bm-player-name">${p1NameHtml}</span>
           <span class="bm-player-score">${p1ScoreVal}</span>
         </div>
         <div class="vs-divider" style="margin: 0; font-size: 10px;">VS</div>
         <div class="${p2Class}">
-          <span class="bm-player-name">${p2 ? escapeHTML(p2.name) : "<i>Por definir</i>"}</span>
+          <span class="bm-player-name">${p2NameHtml}</span>
           <span class="bm-player-score">${p2ScoreVal}</span>
         </div>
       `;
