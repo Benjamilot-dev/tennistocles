@@ -1,0 +1,1039 @@
+// app.js - Lógica principal de Tennistocles
+
+import * as db from "./db.js";
+
+// ==========================================
+// ESTADO GLOBAL DE LA APLICACIÓN
+// ==========================================
+let playersList = [];
+let activeGame = null;
+let activeTournament = null;
+let selectedStarRating = 3; // Rating por defecto al crear jugador
+
+// Mapeo de puntajes tradicionales de tenis
+const TENNIS_POINTS = ["0", "15", "30", "40", "Ad"];
+
+// ==========================================
+// INICIALIZACIÓN Y NAVEGACIÓN
+// ==========================================
+document.addEventListener("DOMContentLoaded", async () => {
+  initApp();
+  setupEventListeners();
+  await loadAndRenderPlayers();
+  await loadAndRenderGames();
+  await loadAndRenderTournaments();
+  checkActiveSessions();
+});
+
+function initApp() {
+  // Ajustar badge de conexión de base de datos
+  updateDbBadge();
+
+  // Escuchar cambios de estado en Firebase
+  window.addEventListener("db-status-changed", (e) => {
+    updateDbBadge(e.detail);
+    loadAndRenderPlayers();
+    loadAndRenderGames();
+    loadAndRenderTournaments();
+  });
+}
+
+function updateDbBadge(statusDetail) {
+  const badge = document.getElementById("db-indicator");
+  const badgeText = document.getElementById("db-badge-text");
+  const statusVal = document.getElementById("settings-status-val");
+  const statusBox = document.getElementById("settings-status-box");
+  const dbStatus = db.getDbStatus();
+
+  badge.className = "db-badge";
+  
+  if (dbStatus.connected) {
+    badge.classList.add("online");
+    badgeText.textContent = "Firebase";
+    if (statusVal) {
+      statusVal.textContent = "Conectado a Firebase (Nube)";
+      statusVal.className = "status-value online";
+      statusBox.style.borderColor = "var(--success)";
+    }
+  } else {
+    badge.classList.add("local");
+    let errorMsg = "";
+    if (statusDetail && statusDetail.error) {
+      errorMsg = ` (${statusDetail.error})`;
+      badge.classList.add("error");
+      badgeText.textContent = "Error DB";
+    } else {
+      badgeText.textContent = "Local";
+    }
+    
+    if (statusVal) {
+      statusVal.textContent = `Desconectado${errorMsg}. Usando LocalStorage.`;
+      statusVal.className = "status-value offline";
+      statusBox.style.borderColor = "var(--border-color)";
+    }
+  }
+
+  // Pre-rellenar formulario de ajustes de Firebase
+  const config = db.getFirebaseConfig();
+  if (config) {
+    document.getElementById("fb-apiKey").value = config.apiKey || "";
+    document.getElementById("fb-projectId").value = config.projectId || "";
+    document.getElementById("fb-authDomain").value = config.authDomain || "";
+    document.getElementById("fb-appId").value = config.appId || "";
+  }
+}
+
+// Comprobar si hay partidos o torneos activos guardados en LocalStorage para reanudar
+function checkActiveSessions() {
+  const savedGame = localStorage.getItem("tennistocles_active_game_session");
+  if (savedGame) {
+    activeGame = JSON.parse(savedGame);
+    showView("view-quick-game");
+    renderLiveScoreboard();
+  }
+
+  const savedTournament = localStorage.getItem("tennistocles_active_tournament_session");
+  if (savedTournament) {
+    activeTournament = JSON.parse(savedTournament);
+    showView("view-tournaments");
+    renderActiveTournament();
+  }
+}
+
+// Cambiar de vista (Navegación SPA)
+function showView(viewId) {
+  // Ocultar todas
+  document.querySelectorAll(".app-view").forEach(view => {
+    view.classList.remove("active");
+  });
+  // Mostrar seleccionada
+  const targetView = document.getElementById(viewId);
+  if (targetView) targetView.classList.add("active");
+
+  // Actualizar tabs de navegación
+  document.querySelectorAll(".nav-tab").forEach(tab => {
+    if (tab.getAttribute("data-view") === viewId) {
+      tab.classList.add("active");
+    } else {
+      tab.classList.remove("active");
+    }
+  });
+
+  // Scroll al inicio
+  document.querySelector(".app-content").scrollTop = 0;
+}
+
+// Configurar todos los Event Listeners
+function setupEventListeners() {
+  // Navegación
+  document.querySelectorAll(".nav-tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      const viewId = tab.getAttribute("data-view");
+      showView(viewId);
+    });
+  });
+
+  //Selector de Estrellas interactivo al crear jugador
+  const starSelector = document.getElementById("star-selector");
+  starSelector.addEventListener("click", (e) => {
+    if (e.target.classList.contains("star-btn")) {
+      const value = parseInt(e.target.getAttribute("data-value"));
+      selectedStarRating = value;
+      
+      // Actualizar visualización
+      document.querySelectorAll("#star-selector .star-btn").forEach(btn => {
+        const btnVal = parseInt(btn.getAttribute("data-value"));
+        if (btnVal <= value) {
+          btn.classList.add("active");
+        } else {
+          btn.classList.remove("active");
+        }
+      });
+    }
+  });
+
+  // Formulario Agregar Jugador
+  const addPlayerForm = document.getElementById("add-player-form");
+  addPlayerForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const nameInput = document.getElementById("player-name");
+    const name = nameInput.value.trim();
+    if (!name) return;
+
+    await db.savePlayer({
+      name: name,
+      stars: selectedStarRating
+    });
+
+    nameInput.value = "";
+    // Resetear estrellas a 3
+    selectedStarRating = 3;
+    document.querySelectorAll("#star-selector .star-btn").forEach(btn => {
+      const val = parseInt(btn.getAttribute("data-value"));
+      btn.classList.toggle("active", val <= 3);
+    });
+
+    await loadAndRenderPlayers();
+  });
+
+  // Ajustes de Firebase
+  const configForm = document.getElementById("firebase-config-form");
+  configForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const config = {
+      apiKey: document.getElementById("fb-apiKey").value.trim(),
+      projectId: document.getElementById("fb-projectId").value.trim(),
+      authDomain: document.getElementById("fb-authDomain").value.trim(),
+      appId: document.getElementById("fb-appId").value.trim()
+    };
+    db.saveFirebaseConfig(config);
+    alert("Configuración de Firebase guardada. Intentando conectar...");
+  });
+
+  document.getElementById("btn-clear-config").addEventListener("click", () => {
+    if (confirm("¿Estás seguro de volver al modo local? Se limpiarán las credenciales.")) {
+      db.saveFirebaseConfig(null);
+      document.getElementById("fb-apiKey").value = "";
+      document.getElementById("fb-projectId").value = "";
+      document.getElementById("fb-authDomain").value = "";
+      document.getElementById("fb-appId").value = "";
+      alert("Configuración eliminada. Operando en LocalStorage.");
+    }
+  });
+
+  // Configuración de Partido Rápido
+  const gameSetupForm = document.getElementById("game-setup-form");
+  gameSetupForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const p1Id = document.getElementById("select-p1").value;
+    const p2Id = document.getElementById("select-p2").value;
+
+    if (p1Id === p2Id) {
+      alert("Por favor selecciona jugadores diferentes.");
+      return;
+    }
+
+    const p1 = playersList.find(p => p.id === p1Id);
+    const p2 = playersList.find(p => p.id === p2Id);
+
+    startNewGame(p1, p2);
+  });
+
+  // Botón Cancelar Partido En Vivo
+  document.getElementById("btn-cancel-game").addEventListener("click", () => {
+    if (confirm("¿Estás seguro de que quieres cancelar el partido actual? Se perderá el progreso.")) {
+      activeGame = null;
+      localStorage.removeItem("tennistocles_active_game_session");
+      document.getElementById("game-live-card").classList.add("hidden");
+      document.getElementById("game-setup-card").classList.remove("hidden");
+    }
+  });
+
+  // Botones de sumar puntos
+  document.getElementById("btn-p1-point").addEventListener("click", () => scorePoint(1));
+  document.getElementById("btn-p2-point").addEventListener("click", () => scorePoint(2));
+
+  // Botón Deshacer
+  document.getElementById("btn-undo-point").addEventListener("click", undoLastPoint);
+
+  // Botón Forzar Fin del Partido
+  document.getElementById("btn-force-finish").addEventListener("click", () => {
+    if (confirm("¿Deseas terminar el partido ahora y declarar ganador al jugador que va al frente?")) {
+      forceFinishGame();
+    }
+  });
+
+  // Formulario de Torneo
+  const tournamentSetupForm = document.getElementById("tournament-setup-form");
+  tournamentSetupForm.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = document.getElementById("tournament-name").value.trim();
+    const size = parseInt(document.querySelector('input[name="tournament-size"]:checked').value);
+
+    createTournament(name, size);
+  });
+
+  // Botón Cancelar/Salir Torneo
+  document.getElementById("btn-cancel-tournament").addEventListener("click", () => {
+    if (activeTournament.status === "finished") {
+      // Si ya finalizó, salir sin advertencia
+      activeTournament = null;
+      localStorage.removeItem("tennistocles_active_tournament_session");
+      document.getElementById("tournament-active-card").classList.add("hidden");
+      document.getElementById("tournament-setup-card").classList.remove("hidden");
+      loadAndRenderTournaments();
+    } else if (confirm("¿Quieres salir del cuadro del torneo? El torneo se mantendrá activo en segundo plano y podrás retomarlo desde el historial.")) {
+      activeTournament = null;
+      localStorage.removeItem("tennistocles_active_tournament_session");
+      document.getElementById("tournament-active-card").classList.add("hidden");
+      document.getElementById("tournament-setup-card").classList.remove("hidden");
+      loadAndRenderTournaments();
+    }
+  });
+}
+
+// ==========================================
+// LÓGICA DE JUGADORES
+// ==========================================
+async function loadAndRenderPlayers() {
+  playersList = await db.getPlayers();
+  
+  // Actualizar contador
+  document.getElementById("player-count").textContent = playersList.length;
+
+  // Renderizar Lista
+  const container = document.getElementById("players-list");
+  container.innerHTML = "";
+
+  if (playersList.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <p>No hay jugadores registrados todavía. ¡Agrega el primero arriba!</p>
+      </div>`;
+    updatePlayerDropdowns();
+    return;
+  }
+
+  playersList.forEach(player => {
+    const card = document.createElement("div");
+    card.className = "player-item";
+    
+    // Generar estrellas visuales
+    let starsHtml = "";
+    for (let i = 1; i <= 5; i++) {
+      if (i <= player.stars) {
+        starsHtml += "★";
+      } else {
+        starsHtml += '<span class="star-empty">★</span>';
+      }
+    }
+
+    card.innerHTML = `
+      <div class="player-info">
+        <span class="player-name-lbl">${escapeHTML(player.name)}</span>
+        <div class="star-display">${starsHtml}</div>
+      </div>
+      <button class="btn-delete" data-id="${player.id}" title="Eliminar jugador">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          <line x1="10" y1="11" x2="10" y2="17"/>
+          <line x1="14" y1="11" x2="14" y2="17"/>
+        </svg>
+      </button>
+    `;
+
+    // Evento de eliminar
+    card.querySelector(".btn-delete").addEventListener("click", async () => {
+      if (confirm(`¿Estás seguro de eliminar a ${player.name}?`)) {
+        await db.deletePlayer(player.id);
+        await loadAndRenderPlayers();
+      }
+    });
+
+    container.appendChild(card);
+  });
+
+  updatePlayerDropdowns();
+}
+
+// Rellenar dropdowns de selección de jugadores
+function updatePlayerDropdowns() {
+  const selectP1 = document.getElementById("select-p1");
+  const selectP2 = document.getElementById("select-p2");
+
+  // Guardar valores seleccionados previamente
+  const val1 = selectP1.value;
+  const val2 = selectP2.value;
+
+  selectP1.innerHTML = '<option value="" disabled selected>Selecciona jugador 1</option>';
+  selectP2.innerHTML = '<option value="" disabled selected>Selecciona jugador 2</option>';
+
+  playersList.forEach(player => {
+    const opt1 = document.createElement("option");
+    opt1.value = player.id;
+    opt1.textContent = `${player.name} (${"★".repeat(player.stars)})`;
+    selectP1.appendChild(opt1);
+
+    const opt2 = document.createElement("option");
+    opt2.value = player.id;
+    opt2.textContent = `${player.name} (${"★".repeat(player.stars)})`;
+    selectP2.appendChild(opt2);
+  });
+
+  // Restaurar selecciones si aún existen
+  if (playersList.some(p => p.id === val1)) selectP1.value = val1;
+  if (playersList.some(p => p.id === val2)) selectP2.value = val2;
+}
+
+// ==========================================
+// LÓGICA DE MARCADOR EN VIVO (JUEGO RÁPIDO)
+// ==========================================
+function startNewGame(p1, p2, tournamentMeta = null) {
+  activeGame = {
+    p1: p1,
+    p2: p2,
+    p1Score: 0, // Indice de TENNIS_POINTS (0,1,2,3)
+    p2Score: 0,
+    p1Games: 0,
+    p2Games: 0,
+    p1Sets: 0,
+    p2Sets: 0,
+    setsHistory: [], // ej: [{p1: 6, p2: 4}]
+    isTiebreak: false,
+    tbP1Points: 0,
+    tbP2Points: 0,
+    history: [], // Para deshacer
+    tournamentMeta: tournamentMeta // { tournamentId, roundIdx, matchIdx }
+  };
+
+  localStorage.setItem("tennistocles_active_game_session", JSON.stringify(activeGame));
+
+  // Ocultar formulario de inicio, mostrar scoreboard
+  document.getElementById("game-setup-card").classList.add("hidden");
+  document.getElementById("game-live-card").classList.remove("hidden");
+
+  renderLiveScoreboard();
+}
+
+function renderLiveScoreboard() {
+  if (!activeGame) return;
+
+  // Nombres
+  document.getElementById("sb-p1-name").textContent = activeGame.p1.name;
+  document.getElementById("sb-p2-name").textContent = activeGame.p2.name;
+
+  // Puntos del Game / Tiebreak
+  const pointsP1El = document.getElementById("sb-p1-points");
+  const pointsP2El = document.getElementById("sb-p2-points");
+
+  if (activeGame.isTiebreak) {
+    pointsP1El.textContent = activeGame.tbP1Points;
+    pointsP2El.textContent = activeGame.tbP2Points;
+    pointsP1El.style.fontSize = "38px";
+    pointsP2El.style.fontSize = "38px";
+  } else {
+    pointsP1El.textContent = TENNIS_POINTS[activeGame.p1Score];
+    pointsP2El.textContent = TENNIS_POINTS[activeGame.p2Score];
+    pointsP1El.style.fontSize = "48px";
+    pointsP2El.style.fontSize = "48px";
+  }
+
+  // Games y Sets
+  document.getElementById("sb-p1-sets").textContent = activeGame.p1Sets;
+  document.getElementById("sb-p2-sets").textContent = activeGame.p2Sets;
+
+  // Historial de Sets anteriores
+  const historyContainer = document.getElementById("sets-history-container");
+  historyContainer.innerHTML = "";
+  
+  if (activeGame.setsHistory.length > 0) {
+    activeGame.setsHistory.forEach(set => {
+      const setEl = document.createElement("span");
+      setEl.className = "set-hist-val";
+      setEl.innerHTML = `<span style="color: ${set.p1 > set.p2 ? 'var(--accent)' : 'inherit'}">${set.p1}</span>-<span style="color: ${set.p2 > set.p1 ? 'var(--accent)' : 'inherit'}">${set.p2}</span>`;
+      historyContainer.appendChild(setEl);
+    });
+  }
+
+  // Agregar el set actual al historial de forma visual si hay juegos
+  if (activeGame.p1Games > 0 || activeGame.p2Games > 0) {
+    const currentSetEl = document.createElement("span");
+    currentSetEl.className = "set-hist-val";
+    currentSetEl.style.borderBottom = "2px solid var(--accent)";
+    currentSetEl.innerHTML = `${activeGame.p1Games}-${activeGame.p2Games}`;
+    historyContainer.appendChild(currentSetEl);
+  }
+
+  // Habilitar / deshabilitar Deshacer
+  document.getElementById("btn-undo-point").disabled = activeGame.history.length === 0;
+}
+
+// Guardar snapshot de estado para deshacer
+function pushToHistory() {
+  const snapshot = {
+    p1Score: activeGame.p1Score,
+    p2Score: activeGame.p2Score,
+    p1Games: activeGame.p1Games,
+    p2Games: activeGame.p2Games,
+    p1Sets: activeGame.p1Sets,
+    p2Sets: activeGame.p2Sets,
+    isTiebreak: activeGame.isTiebreak,
+    tbP1Points: activeGame.tbP1Points,
+    tbP2Points: activeGame.tbP2Points,
+    setsHistory: JSON.parse(JSON.stringify(activeGame.setsHistory))
+  };
+  activeGame.history.push(snapshot);
+}
+
+function undoLastPoint() {
+  if (!activeGame || activeGame.history.length === 0) return;
+
+  const previousState = activeGame.history.pop();
+  activeGame.p1Score = previousState.p1Score;
+  activeGame.p2Score = previousState.p2Score;
+  activeGame.p1Games = previousState.p1Games;
+  activeGame.p2Games = previousState.p2Games;
+  activeGame.p1Sets = previousState.p1Sets;
+  activeGame.p2Sets = previousState.p2Sets;
+  activeGame.isTiebreak = previousState.isTiebreak;
+  activeGame.tbP1Points = previousState.tbP1Points;
+  activeGame.tbP2Points = previousState.tbP2Points;
+  activeGame.setsHistory = previousState.setsHistory;
+
+  localStorage.setItem("tennistocles_active_game_session", JSON.stringify(activeGame));
+  renderLiveScoreboard();
+}
+
+// Incrementar punto
+function scorePoint(playerNum) {
+  if (!activeGame) return;
+
+  pushToHistory();
+
+  if (activeGame.isTiebreak) {
+    // LÓGICA DE TIEBREAK (Numérica: 1, 2, 3...)
+    if (playerNum === 1) {
+      activeGame.tbP1Points++;
+    } else {
+      activeGame.tbP2Points++;
+    }
+
+    // Ganar Tiebreak: al menos 7 puntos y diferencia de 2
+    const p1Pt = activeGame.tbP1Points;
+    const p2Pt = activeGame.tbP2Points;
+
+    if (p1Pt >= 7 && (p1Pt - p2Pt) >= 2) {
+      winGame(1);
+    } else if (p2Pt >= 7 && (p2Pt - p1Pt) >= 2) {
+      winGame(2);
+    }
+  } else {
+    // LÓGICA DE TENIS ESTÁNDAR (0 -> 15 -> 30 -> 40 -> Ad)
+    if (playerNum === 1) {
+      if (activeGame.p1Score === 3) { // 40
+        if (activeGame.p2Score === 4) { // Ventaja P2
+          activeGame.p2Score = 3; // Regresa a Deuce (40)
+        } else if (activeGame.p2Score === 3) { // Deuce
+          activeGame.p1Score = 4; // Ventaja P1
+        } else { // P2 tiene 30 o menos
+          winGame(1);
+        }
+      } else if (activeGame.p1Score === 4) { // Ventaja P1 y anota
+        winGame(1);
+      } else {
+        activeGame.p1Score++; // 0 -> 15 -> 30 -> 40
+      }
+    } else {
+      if (activeGame.p2Score === 3) { // 40
+        if (activeGame.p1Score === 4) { // Ventaja P1
+          activeGame.p1Score = 3; // Regresa a Deuce (40)
+        } else if (activeGame.p1Score === 3) { // Deuce
+          activeGame.p2Score = 4; // Ventaja P2
+        } else { // P1 tiene 30 o menos
+          winGame(2);
+        }
+      } else if (activeGame.p2Score === 4) { // Ventaja P2 y anota
+        winGame(2);
+      } else {
+        activeGame.p2Score++; // 0 -> 15 -> 30 -> 40
+      }
+    }
+  }
+
+  localStorage.setItem("tennistocles_active_game_session", JSON.stringify(activeGame));
+  renderLiveScoreboard();
+}
+
+function winGame(playerNum) {
+  // Limpiar puntuaciones del game actual
+  activeGame.p1Score = 0;
+  activeGame.p2Score = 0;
+  activeGame.isTiebreak = false;
+  activeGame.tbP1Points = 0;
+  activeGame.tbP2Points = 0;
+
+  // Asignar el juego ganado
+  if (playerNum === 1) {
+    activeGame.p1Games++;
+  } else {
+    activeGame.p2Games++;
+  }
+
+  // Evaluar Set
+  const g1 = activeGame.p1Games;
+  const g2 = activeGame.p2Games;
+
+  // Un set se gana con 6 juegos si hay diferencia de 2, o por tiebreak a los 7
+  if (g1 >= 6 && (g1 - g2) >= 2) {
+    winSet(1);
+  } else if (g2 >= 6 && (g2 - g1) >= 2) {
+    winSet(2);
+  } else if (g1 === 6 && g2 === 6) {
+    // Entrar a Tiebreak
+    activeGame.isTiebreak = true;
+  }
+}
+
+function winSet(playerNum) {
+  // Registrar en historial de sets
+  activeGame.setsHistory.push({
+    p1: activeGame.p1Games,
+    p2: activeGame.p2Games
+  });
+
+  // Resetear juegos del set
+  activeGame.p1Games = 0;
+  activeGame.p2Games = 0;
+
+  // Asignar Set
+  if (playerNum === 1) {
+    activeGame.p1Sets++;
+  } else {
+    activeGame.p2Sets++;
+  }
+
+  // Evaluar fin del partido (Mejor de 3 sets: quien gane 2 gana)
+  if (activeGame.p1Sets === 2) {
+    finishGame(1);
+  } else if (activeGame.p2Sets === 2) {
+    finishGame(2);
+  }
+}
+
+async function finishGame(winnerNum) {
+  const winner = winnerNum === 1 ? activeGame.p1 : activeGame.p2;
+  alert(`¡Partido Finalizado! Ganador: ${winner.name}`);
+
+  // Guardar en la base de datos
+  const gameRecord = {
+    player1Id: activeGame.p1.id,
+    player2Id: activeGame.p2.id,
+    player1Name: activeGame.p1.name,
+    player2Name: activeGame.p2.name,
+    score: {
+      p1Sets: activeGame.p1Sets,
+      p2Sets: activeGame.p2Sets,
+      setsHistory: activeGame.setsHistory
+    },
+    status: "finished",
+    winnerId: winner.id
+  };
+
+  await db.saveGame(gameRecord);
+
+  // Si este partido pertenecía a un torneo, avanzar el torneo
+  if (activeGame.tournamentMeta) {
+    await advanceTournamentMatch(activeGame.tournamentMeta, winner.id, gameRecord.score);
+  }
+
+  // Limpiar sesión de juego activo
+  activeGame = null;
+  localStorage.removeItem("tennistocles_active_game_session");
+
+  // Mostrar el panel correcto
+  if (gameRecord.tournamentMeta) {
+    showView("view-tournaments");
+  } else {
+    // Volver a configurar juego y recargar historial
+    document.getElementById("game-live-card").classList.add("hidden");
+    document.getElementById("game-setup-card").classList.remove("hidden");
+    await loadAndRenderGames();
+  }
+}
+
+function forceFinishGame() {
+  if (!activeGame) return;
+
+  // Quién tiene más sets, o si están iguales en sets, quién tiene más games en el actual
+  let winnerNum = 1;
+  if (activeGame.p2Sets > activeGame.p1Sets) {
+    winnerNum = 2;
+  } else if (activeGame.p1Sets === activeGame.p2Sets) {
+    if (activeGame.p2Games > activeGame.p1Games) {
+      winnerNum = 2;
+    } else if (activeGame.p1Games === activeGame.p2Games) {
+      // Desempate por puntos en el game
+      if (activeGame.isTiebreak) {
+        if (activeGame.tbP2Points > activeGame.tbP1Points) winnerNum = 2;
+      } else {
+        if (activeGame.p2Score > activeGame.p1Score) winnerNum = 2;
+      }
+    }
+  }
+
+  // Añadir set incompleto actual al historial
+  activeGame.setsHistory.push({
+    p1: activeGame.p1Games,
+    p2: activeGame.p2Games
+  });
+
+  finishGame(winnerNum);
+}
+
+// Renderizar historial de juegos rápidos
+async function loadAndRenderGames() {
+  const games = await db.getGames();
+  const container = document.getElementById("games-list");
+  container.innerHTML = "";
+
+  if (games.length === 0) {
+    container.innerHTML = `<div class="empty-state"><p>No hay partidos registrados en el historial.</p></div>`;
+    return;
+  }
+
+  games.forEach(game => {
+    const card = document.createElement("div");
+    card.className = "game-history-card";
+
+    // Formatear score
+    const p1Sets = game.score.p1Sets;
+    const p2Sets = game.score.p2Sets;
+    const isP1Winner = game.winnerId === game.player1Id;
+    const isP2Winner = game.winnerId === game.player2Id;
+
+    let setsDetailHtml = "";
+    if (game.score.setsHistory && game.score.setsHistory.length > 0) {
+      setsDetailHtml = game.score.setsHistory.map(s => `${s.p1}-${s.p2}`).join(", ");
+    }
+
+    card.innerHTML = `
+      <div class="gh-players">
+        <div class="gh-player ${isP1Winner ? 'winner' : ''}">
+          <span>${escapeHTML(game.player1Name)}</span>
+          ${isP1Winner ? '<span class="winner-crown">👑</span>' : ''}
+        </div>
+        <div class="gh-player ${isP2Winner ? 'winner' : ''}">
+          <span>${escapeHTML(game.player2Name)}</span>
+          ${isP2Winner ? '<span class="winner-crown">👑</span>' : ''}
+        </div>
+        <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">
+          ${setsDetailHtml}
+        </div>
+      </div>
+      <div class="gh-score">
+        ${p1Sets}-${p2Sets}
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+// ==========================================
+// LÓGICA DE TORNEOS
+// ==========================================
+async function createTournament(name, size) {
+  // Validar si hay suficientes jugadores
+  if (playersList.length < size) {
+    alert(`Se requieren al menos ${size} jugadores registrados para crear este torneo. Actualmente tienes ${playersList.length}.`);
+    return;
+  }
+
+  // 1. Elegir automáticamente a los mejores jugadores según su puntaje
+  // Ordenar por estrellas de mayor a menor y por fecha de creación como fallback
+  const sortedPlayers = [...playersList].sort((a, b) => {
+    if (b.stars !== a.stars) {
+      return b.stars - a.stars;
+    }
+    return new Date(a.createdAt) - new Date(b.createdAt);
+  });
+
+  const selectedPlayers = sortedPlayers.slice(0, size);
+
+  // 2. Sembrar jugadores (Seed pairings) para emparejamiento equilibrado
+  // ej: 4 jugadores [1, 2, 3, 4] -> Sembras: 1 vs 4, 2 vs 3
+  // ej: 8 jugadores [1, 2, 3, 4, 5, 6, 7, 8] -> Sembras: 1vs8, 4vs5, 3vs6, 2vs7
+  let matchesRound0 = [];
+  if (size === 4) {
+    matchesRound0 = [
+      createBracketMatch(selectedPlayers[0], selectedPlayers[3]), // Semilla 1 vs 4
+      createBracketMatch(selectedPlayers[1], selectedPlayers[2])  // Semilla 2 vs 3
+    ];
+  } else if (size === 8) {
+    matchesRound0 = [
+      createBracketMatch(selectedPlayers[0], selectedPlayers[7]), // Semilla 1 vs 8
+      createBracketMatch(selectedPlayers[3], selectedPlayers[4]), // Semilla 4 vs 5
+      createBracketMatch(selectedPlayers[2], selectedPlayers[5]), // Semilla 3 vs 6
+      createBracketMatch(selectedPlayers[1], selectedPlayers[6])  // Semilla 2 vs 7
+    ];
+  }
+
+  // Estructura de Rondas
+  // Para 4 jugadores: 2 rondas (Semifinales, Final)
+  // Para 8 jugadores: 3 rondas (Cuartos, Semifinales, Final)
+  const rounds = [];
+  if (size === 4) {
+    rounds.push(matchesRound0); // Semifinales
+    rounds.push([createEmptyBracketMatch()]); // Final
+  } else if (size === 8) {
+    rounds.push(matchesRound0); // Cuartos
+    rounds.push([createEmptyBracketMatch(), createEmptyBracketMatch()]); // Semifinales
+    rounds.push([createEmptyBracketMatch()]); // Final
+  }
+
+  const newTournament = {
+    name: name,
+    size: size,
+    players: selectedPlayers.map(p => p.id),
+    rounds: rounds,
+    status: "active",
+    winnerId: null
+  };
+
+  const saved = await db.saveTournament(newTournament);
+  activeTournament = saved;
+  localStorage.setItem("tennistocles_active_tournament_session", JSON.stringify(activeTournament));
+
+  // Resetear formulario
+  document.getElementById("tournament-name").value = "";
+
+  // Mostrar el cuadro del torneo
+  document.getElementById("tournament-setup-card").classList.add("hidden");
+  document.getElementById("tournament-active-card").classList.remove("hidden");
+  
+  renderActiveTournament();
+}
+
+function createBracketMatch(p1, p2) {
+  return {
+    id: 'm_' + Math.random().toString(36).substr(2, 9),
+    player1: p1 ? { id: p1.id, name: p1.name } : null,
+    player2: p2 ? { id: p2.id, name: p2.name } : null,
+    score: null, // { p1Sets, p2Sets }
+    winnerId: null,
+    status: "pending" // pending | playing | finished
+  };
+}
+
+function createEmptyBracketMatch() {
+  return createBracketMatch(null, null);
+}
+
+// Dibujar el cuadro (bracket) del torneo activo
+function renderActiveTournament() {
+  if (!activeTournament) return;
+
+  document.getElementById("t-active-name").textContent = activeTournament.name;
+
+  const bracketContainer = document.getElementById("bracket-container");
+  bracketContainer.innerHTML = "";
+
+  // Determinar los títulos de ronda según el tamaño del torneo
+  let roundNames = [];
+  if (activeTournament.size === 4) {
+    roundNames = ["Semifinales", "Final"];
+  } else {
+    roundNames = ["Cuartos de final", "Semifinales", "Final"];
+  }
+
+  activeTournament.rounds.forEach((round, roundIdx) => {
+    const roundDiv = document.createElement("div");
+    roundDiv.className = "bracket-round";
+    
+    // Título de la ronda
+    const roundTitle = document.createElement("div");
+    roundTitle.className = "bracket-round-name";
+    roundTitle.textContent = roundNames[roundIdx];
+    roundDiv.appendChild(roundTitle);
+
+    round.forEach((match, matchIdx) => {
+      const matchDiv = document.createElement("div");
+      matchDiv.className = "bracket-match";
+      
+      const p1 = match.player1;
+      const p2 = match.player2;
+      const hasBothPlayers = p1 && p2;
+      const isFinished = match.status === "finished";
+
+      if (hasBothPlayers && !isFinished) {
+        matchDiv.classList.add("clickable");
+        matchDiv.title = "Toca para jugar este partido";
+      }
+
+      // Clases para ganadores/perdedores
+      const p1Winner = isFinished && match.winnerId === p1?.id;
+      const p2Winner = isFinished && match.winnerId === p2?.id;
+
+      const p1Class = p1Winner ? "bm-player winner" : (isFinished ? "bm-player loser" : "bm-player");
+      const p2Class = p2Winner ? "bm-player winner" : (isFinished ? "bm-player loser" : "bm-player");
+
+      const p1ScoreVal = isFinished ? match.score.p1Sets : "";
+      const p2ScoreVal = isFinished ? match.score.p2Sets : "";
+
+      matchDiv.innerHTML = `
+        <div class="${p1Class}">
+          <span class="bm-player-name">${p1 ? escapeHTML(p1.name) : "<i>Por definir</i>"}</span>
+          <span class="bm-player-score">${p1ScoreVal}</span>
+        </div>
+        <div class="vs-divider" style="margin: 0; font-size: 10px;">VS</div>
+        <div class="${p2Class}">
+          <span class="bm-player-name">${p2 ? escapeHTML(p2.name) : "<i>Por definir</i>"}</span>
+          <span class="bm-player-score">${p2ScoreVal}</span>
+        </div>
+      `;
+
+      // Si es clickeable, abrir la ventana de marcador en vivo
+      if (hasBothPlayers && !isFinished) {
+        matchDiv.addEventListener("click", () => {
+          if (confirm(`¿Deseas iniciar el partido entre ${p1.name} y ${p2.name}?`)) {
+            // Ir al marcador en vivo
+            showView("view-quick-game");
+            startNewGame(p1, p2, {
+              tournamentId: activeTournament.id,
+              roundIdx: roundIdx,
+              matchIdx: matchIdx
+            });
+          }
+        });
+      }
+
+      roundDiv.appendChild(matchDiv);
+    });
+
+    bracketContainer.appendChild(roundDiv);
+  });
+
+  // Mostrar pancarta de Campeón si el torneo finalizó
+  if (activeTournament.status === "finished") {
+    const winnerPlayer = playersList.find(p => p.id === activeTournament.winnerId);
+    if (winnerPlayer) {
+      const winnerBanner = document.createElement("div");
+      winnerBanner.className = "bracket-winner-banner";
+      winnerBanner.innerHTML = `
+        <h4>🏆 Campeón del Torneo 🏆</h4>
+        <p>${escapeHTML(winnerPlayer.name)}</p>
+      `;
+      bracketContainer.appendChild(winnerBanner);
+    }
+  }
+}
+
+// Avanzar partido y re-escribir llaves en el torneo
+async function advanceTournamentMatch(meta, winnerId, score) {
+  if (!activeTournament || activeTournament.id !== meta.tournamentId) return;
+
+  const round = activeTournament.rounds[meta.roundIdx];
+  const match = round[meta.matchIdx];
+
+  // Actualizar el partido
+  match.score = score;
+  match.winnerId = winnerId;
+  match.status = "finished";
+
+  // Buscar el siguiente partido al que avanza el ganador
+  const nextRoundIdx = meta.roundIdx + 1;
+  if (nextRoundIdx < activeTournament.rounds.length) {
+    const nextMatchIdx = Math.floor(meta.matchIdx / 2);
+    const nextMatch = activeTournament.rounds[nextRoundIdx][nextMatchIdx];
+    const isFirstSlot = meta.matchIdx % 2 === 0;
+
+    const winnerName = match.player1.id === winnerId ? match.player1.name : match.player2.name;
+
+    if (isFirstSlot) {
+      nextMatch.player1 = { id: winnerId, name: winnerName };
+    } else {
+      nextMatch.player2 = { id: winnerId, name: winnerName };
+    }
+    nextMatch.status = "pending";
+  } else {
+    // Si fue el partido final de la última ronda, terminar el torneo
+    activeTournament.status = "finished";
+    activeTournament.winnerId = winnerId;
+  }
+
+  // Guardar torneo actualizado
+  await db.saveTournament(activeTournament);
+  localStorage.setItem("tennistocles_active_tournament_session", JSON.stringify(activeTournament));
+
+  // Volver a renderizar
+  renderActiveTournament();
+}
+
+// Cargar lista de torneos históricos
+async function loadAndRenderTournaments() {
+  const tournaments = await db.getTournaments();
+  const container = document.getElementById("tournaments-list");
+  container.innerHTML = "";
+
+  if (tournaments.length === 0) {
+    container.innerHTML = `<div class="empty-state"><p>No hay torneos registrados en el historial.</p></div>`;
+    return;
+  }
+
+  tournaments.forEach(tournament => {
+    const card = document.createElement("div");
+    card.className = "player-item"; // Usamos los mismos estilos base de ítems para ahorrar código CSS
+    
+    const isFinished = tournament.status === "finished";
+    const statusText = isFinished ? "Finalizado" : "En Progreso";
+    const statusClass = isFinished ? "color: var(--success)" : "color: var(--accent)";
+
+    // Encontrar ganador si finalizó
+    let winnerName = "";
+    if (isFinished && tournament.winnerId) {
+      // Podría no estar en playersList temporal si se borró, pero intentamos buscar
+      const winner = playersList.find(p => p.id === tournament.winnerId);
+      winnerName = winner ? ` - Campeón: ${winner.name}` : "";
+    }
+
+    card.innerHTML = `
+      <div class="player-info">
+        <span class="player-name-lbl">${escapeHTML(tournament.name)}</span>
+        <span style="font-size:12px; ${statusClass}; font-weight:600;">
+          ${statusText} ${winnerName}
+        </span>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-secondary btn-sm btn-resume" style="padding: 6px 12px; border-radius: 8px;">Ver</button>
+        <button class="btn-delete" title="Eliminar torneo">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+          </svg>
+        </button>
+      </div>
+    `;
+
+    // Reanudar/Ver el torneo seleccionado
+    card.querySelector(".btn-resume").addEventListener("click", () => {
+      activeTournament = tournament;
+      localStorage.setItem("tennistocles_active_tournament_session", JSON.stringify(activeTournament));
+      document.getElementById("tournament-setup-card").classList.add("hidden");
+      document.getElementById("tournament-active-card").classList.remove("hidden");
+      renderActiveTournament();
+    });
+
+    // Eliminar torneo del historial
+    card.querySelector(".btn-delete").addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (confirm(`¿Estás seguro de eliminar el torneo "${tournament.name}"?`)) {
+        await db.deleteTournament(tournament.id);
+        if (activeTournament && activeTournament.id === tournament.id) {
+          activeTournament = null;
+          localStorage.removeItem("tennistocles_active_tournament_session");
+          document.getElementById("tournament-active-card").classList.add("hidden");
+          document.getElementById("tournament-setup-card").classList.remove("hidden");
+        }
+        await loadAndRenderTournaments();
+      }
+    });
+
+    container.appendChild(card);
+  });
+}
+
+// ==========================================
+// AUXILIARES
+// ==========================================
+function escapeHTML(str) {
+  if (!str) return "";
+  return str.replace(/[&<>'"]/g, 
+    tag => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;'
+    }[tag] || tag)
+  );
+}
