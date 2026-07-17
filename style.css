@@ -50,6 +50,7 @@ body {
   width: 100%;
   max-width: 480px;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background-color: var(--bg-main);
@@ -143,7 +144,7 @@ body {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
-  padding-bottom: 90px; /* Space for nav bar */
+  padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); /* Espacio extra seguro para barra de navegación y notch */
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
 }
@@ -851,7 +852,7 @@ select {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 76px;
+  height: calc(76px + env(safe-area-inset-bottom, 0px));
   background-color: rgba(28, 28, 28, 0.95);
   backdrop-filter: blur(16px);
   border-top: 1px solid var(--border-color);
@@ -859,7 +860,7 @@ select {
   justify-content: space-around;
   align-items: center;
   padding: 0 10px;
-  padding-bottom: 12px; /* iOS home bar safe space */
+  padding-bottom: env(safe-area-inset-bottom, 12px); /* Mapeo de barra de inicio en iOS/Android */
   z-index: 10;
 }
 
