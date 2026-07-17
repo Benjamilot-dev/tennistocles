@@ -215,8 +215,9 @@ function setupEventListeners() {
 
     const p1 = playersList.find(p => p.id === p1Id);
     const p2 = playersList.find(p => p.id === p2Id);
+    const format = document.getElementById("game-format").value;
 
-    startNewGame(p1, p2);
+    startNewGame(p1, p2, null, format);
   });
 
   // Botón Cancelar Partido En Vivo
@@ -249,8 +250,9 @@ function setupEventListeners() {
     e.preventDefault();
     const name = document.getElementById("tournament-name").value.trim();
     const size = parseInt(document.getElementById("tournament-size").value);
+    const format = document.getElementById("tournament-format").value;
 
-    createTournament(name, size);
+    createTournament(name, size, format);
   });
 
   // Botón Cancelar/Salir Torneo
@@ -378,7 +380,7 @@ function updatePlayerDropdowns() {
 // ==========================================
 // LÓGICA DE MARCADOR EN VIVO (JUEGO RÁPIDO)
 // ==========================================
-function startNewGame(p1, p2, tournamentMeta = null) {
+function startNewGame(p1, p2, tournamentMeta = null, format = "3-sets") {
   activeGame = {
     p1: p1,
     p2: p2,
@@ -602,10 +604,11 @@ function winSet(playerNum) {
     activeGame.p2Sets++;
   }
 
-  // Evaluar fin del partido (Mejor de 3 sets: quien gane 2 gana)
-  if (activeGame.p1Sets === 2) {
+  // Evaluar fin del partido (Mejor de 3 sets o Set Único)
+  const maxSets = activeGame.format === "1-set" ? 1 : 2;
+  if (activeGame.p1Sets === maxSets) {
     finishGame(1);
-  } else if (activeGame.p2Sets === 2) {
+  } else if (activeGame.p2Sets === maxSets) {
     finishGame(2);
   }
 }
@@ -731,7 +734,7 @@ async function loadAndRenderGames() {
 // ==========================================
 // LÓGICA DE TORNEOS
 // ==========================================
-async function createTournament(name, size) {
+async function createTournament(name, size, format = "3-sets") {
   if (size < 2) {
     alert("Se requieren al menos 2 jugadores para crear un torneo.");
     return;
@@ -804,6 +807,7 @@ async function createTournament(name, size) {
   const newTournament = {
     name: name,
     size: size,
+    format: format,
     players: selectedPlayers.map(p => p.id),
     rounds: rounds,
     status: "active",
@@ -938,17 +942,39 @@ function renderActiveTournament() {
         </div>
       `;
 
-      // Si es clickeable, abrir la ventana de marcador en vivo
+      // Si es clickeable, preguntar si jugar en vivo o ingresar resultado manual
       if (hasBothPlayers && !isFinished) {
         matchDiv.addEventListener("click", () => {
-          if (confirm(`¿Deseas iniciar el partido entre ${p1.name} y ${p2.name}?`)) {
+          const choice = confirm(`¿Deseas jugar este partido con el Marcador en Vivo?\n\nPresiona [Aceptar] para ir al Marcador en Vivo.\nPresiona [Cancelar] para registrar el resultado de forma manual.`);
+          if (choice) {
             // Ir al marcador en vivo
             showView("view-quick-game");
             startNewGame(p1, p2, {
               tournamentId: activeTournament.id,
               roundIdx: roundIdx,
               matchIdx: matchIdx
-            });
+            }, activeTournament.format);
+          } else {
+            // Registro manual del resultado
+            const winnerChoice = prompt(`¿Quién ganó el partido?\n\nEscribe "1" para: ${p1.name}\nEscribe "2" para: ${p2.name}`);
+            if (winnerChoice === "1" || winnerChoice === "2") {
+              const winnerNum = parseInt(winnerChoice);
+              const maxSets = activeTournament.format === "1-set" ? 1 : 2;
+              const defaultScore = winnerNum === 1 ? `${maxSets}-0` : `0-${maxSets}`;
+              const scoreStr = prompt(`Ingresa el resultado final de Sets (ej. 2-0, 2-1, 1-0):`, defaultScore);
+              if (scoreStr) {
+                const parts = scoreStr.split("-").map(Number);
+                const p1Sets = isNaN(parts[0]) ? 0 : parts[0];
+                const p2Sets = isNaN(parts[1]) ? 0 : parts[1];
+                const winnerId = winnerNum === 1 ? p1.id : p2.id;
+                
+                advanceTournamentMatch({
+                  tournamentId: activeTournament.id,
+                  roundIdx: roundIdx,
+                  matchIdx: matchIdx
+                }, winnerId, { p1Sets, p2Sets });
+              }
+            }
           }
         });
       }
