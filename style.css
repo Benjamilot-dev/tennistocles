@@ -1,22 +1,23 @@
-/* style.css - Diseño Premium y Mobile-First para Tennistocles */
+/* style.css - Diseño Premium y Mobile-First para Olivia Tennis */
 
 :root {
-  --bg-main: #0b0f19;
-  --bg-card: #151f32;
-  --bg-input: #1f2d47;
-  --border-color: rgba(255, 255, 255, 0.08);
+  --bg-main: #141414; /* Negro mate carbón profundo */
+  --bg-card: #202020; /* Gris muy oscuro de la tarjeta */
+  --bg-input: #282828; /* Gris medio para inputs */
+  --border-color: rgba(255, 255, 255, 0.1);
   
-  --text-primary: #f3f4f6;
-  --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
+  --text-primary: #ffffff;
+  --text-secondary: #b0b0b0;
+  --text-muted: #6e6e6e;
   
-  --accent: #ccff00; /* Verde Tenis Fosforescente */
-  --accent-rgb: 204, 255, 0;
-  --accent-hover: #b8e600;
+  --accent: #ffffff; /* Blanco puro para acentos */
+  --accent-rgb: 255, 255, 255;
+  --accent-hover: #e0e0e0;
   
   --danger: #ef4444;
-  --success: #10b981;
-  --star-color: #fbbf24;
+  --success: #ffffff; /* Éxito en blanco para monocromático */
+  --success-real: #10b981;
+  --star-color: #ffffff; /* Estrellas blancas */
 }
 
 * {
@@ -28,7 +29,14 @@
 }
 
 body {
-  background-color: #030712;
+  background-color: #0e0e0e;
+  background-image: repeating-linear-gradient(
+    45deg,
+    #0e0e0e,
+    #0e0e0e 10px,
+    #141414 10px,
+    #141414 20px
+  );
   display: flex;
   justify-content: center;
   align-items: center;
@@ -46,14 +54,14 @@ body {
   flex-direction: column;
   background-color: var(--bg-main);
   position: relative;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8);
 }
 
 @media (min-width: 480px) {
   .app-container {
     height: 92vh;
     border-radius: 32px;
-    border: 1px solid var(--border-color);
+    border: 2px solid var(--border-color);
     overflow: hidden;
   }
 }
@@ -64,7 +72,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 16px 20px;
-  background-color: rgba(11, 15, 25, 0.85);
+  background-color: rgba(20, 20, 20, 0.9);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border-color);
   z-index: 10;
@@ -81,12 +89,12 @@ body {
   font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #ffffff 30%, var(--accent) 100%);
+  background: linear-gradient(135deg, #ffffff 40%, var(--text-secondary) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-.tennis-icon {
+.cat-icon {
   color: var(--accent);
   animation: pulse-slow 3s infinite ease-in-out;
 }
@@ -418,7 +426,7 @@ select {
 /* Live Scoreboard Page Layout */
 #game-live-card {
   position: relative;
-  background: radial-gradient(circle at top right, rgba(204, 255, 0, 0.05), var(--bg-card) 60%);
+  background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.04), var(--bg-card) 60%);
   overflow: hidden;
 }
 
@@ -474,7 +482,7 @@ select {
   font-weight: 800;
   color: var(--accent);
   line-height: 1;
-  text-shadow: 0 0 15px rgba(204, 255, 0, 0.25);
+  text-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
   background-color: rgba(0,0,0,0.25);
   width: 90px;
   height: 90px;
@@ -654,8 +662,8 @@ select {
 .info-alert {
   display: flex;
   gap: 8px;
-  background-color: rgba(204, 255, 0, 0.05);
-  border: 1px solid rgba(204, 255, 0, 0.15);
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   padding: 12px;
   font-size: 13px;
@@ -726,7 +734,7 @@ select {
 
 .bracket-match.active {
   border-color: var(--accent);
-  box-shadow: 0 0 10px rgba(204, 255, 0, 0.15);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.15);
 }
 
 .bracket-match.finished {
@@ -744,7 +752,7 @@ select {
 }
 
 .bm-player.winner {
-  background-color: rgba(204, 255, 0, 0.08);
+  background-color: rgba(255, 255, 255, 0.08);
   color: var(--accent);
   font-weight: 700;
 }
@@ -767,7 +775,7 @@ select {
 
 .bracket-winner-banner {
   text-align: center;
-  background: linear-gradient(135deg, rgba(204, 255, 0, 0.15) 0%, rgba(204, 255, 0, 0.02) 100%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 100%);
   border: 1px solid var(--accent);
   border-radius: 16px;
   padding: 16px;
@@ -844,7 +852,7 @@ select {
   left: 0;
   right: 0;
   height: 76px;
-  background-color: rgba(17, 24, 39, 0.95);
+  background-color: rgba(28, 28, 28, 0.95);
   backdrop-filter: blur(16px);
   border-top: 1px solid var(--border-color);
   display: flex;
@@ -981,7 +989,7 @@ select {
 
 .help-card {
   background-color: rgba(30, 41, 59, 0.45) !important;
-  border-color: rgba(204, 255, 0, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
   animation: fadeIn 0.2s ease-out forwards;
 }
 

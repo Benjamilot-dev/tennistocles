@@ -1,4 +1,13 @@
-// db.js - Capa de persistencia para Tennistocles (Firebase + LocalStorage Fallback)
+// CONFIGURACIÓN POR DEFECTO DE FIREBASE
+// Si deseas dejar configurada la base de datos de manera permanente para todos los celulares,
+// rellena estos datos aquí y guarda el archivo. Si los dejas vacíos, la app
+// cargará la configuración que se ingrese en la pestaña "Ajustes".
+const DEFAULT_FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBkiZvLZMm6rHlAO3NN4XcjGmKZ9l4jYBE",
+  projectId: "tennistocles",
+  authDomain: "tennistocles.firebaseapp.com",
+  appId: "1:964690549990:web:7f012216889685c2a8ef27"
+};
 
 let db = null;
 let firebaseApp = null;
@@ -37,8 +46,12 @@ export function initDatabase() {
   }
 }
 
-// Configuración de Firebase
 export function getFirebaseConfig() {
+  // 1. Intentar cargar la configuración hardcodeada por defecto en este archivo
+  if (DEFAULT_FIREBASE_CONFIG.apiKey && DEFAULT_FIREBASE_CONFIG.projectId) {
+    return DEFAULT_FIREBASE_CONFIG;
+  }
+  // 2. Si no, intentar cargarla del LocalStorage (Ajustes de la app)
   const config = localStorage.getItem("tennistocles_firebase_config");
   return config ? JSON.parse(config) : null;
 }
@@ -83,7 +96,7 @@ export async function getPlayers() {
       console.warn("Fallo lectura Firebase (Jugadores). Usando LocalStorage fallback.", error);
     }
   }
-  
+
   // LocalStorage fallback
   const local = localStorage.getItem("tennistocles_players");
   return local ? JSON.parse(local) : [];
